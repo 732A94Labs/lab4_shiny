@@ -1,4 +1,4 @@
-# Lab 4 Shiny App
+# Lab 5 Shiny App
 
 Run the application directly from R with:
 
