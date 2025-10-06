@@ -17,6 +17,10 @@
 #' @name api_client
 NULL
 
+.api_cache <- new.env(parent = emptyenv())
+.api_cache$countries <- NULL
+.api_cache$geoms <- new.env(parent = emptyenv())
+
 #' Fetch the list of available countries from Overpass
 #'
 #' Queries the public Overpass API for OSM relations tagged as
@@ -35,6 +39,9 @@ NULL
 #' query complexity and frequency. If you run many tests or scripts, add
 #' caching and/or point to your own Overpass instance.
 #'
+#' @param force_refresh Logical. If `TRUE`, bypasses the in-memory cache and
+#'   queries Overpass again. Defaults to `FALSE`.
+#'
 #' @return
 #' A `data.frame` where each row represents a country relation (and possibly
 #' a `land_area` relation where available). Column types are inferred by
@@ -51,7 +58,12 @@ NULL
 #' @export
 #' @importFrom httr2 request req_user_agent req_method req_body_raw req_timeout req_perform resp_body_string
 #' @importFrom utils read.csv
-fetch_countries <- function() {
+
+fetch_countries <- function(force_refresh = FALSE) {
+  if (!force_refresh && !is.null(.api_cache$countries)) {
+    return(.api_cache$countries)
+  }
+
   overpass <- "https://overpass-api.de/api/interpreter"
   q <- '
   [out:csv(
@@ -77,6 +89,8 @@ fetch_countries <- function() {
 
   df <- read.csv(text = txt, stringsAsFactors = FALSE, check.names = FALSE)
 
+  .api_cache$countries <- df
+
   return(df)
 }
 
@@ -97,6 +111,8 @@ fetch_countries <- function() {
 #'
 #' @param rel_id Integer or character. An OSM relation id, **without** the
 #'   `R` prefix (the function prepends it internally for the `osm_ids` query).
+#' @param force_refresh Logical. If `TRUE`, the cached geometry for `rel_id`
+#'   (if present) is ignored and a fresh request is made.
 #'
 #' @return
 #' An `sf` object with one feature (the requested relation) containing:
@@ -116,7 +132,14 @@ fetch_countries <- function() {
 #' @importFrom httr2 request req_user_agent req_url_query req_perform resp_status resp_body_json
 #' @importFrom jsonlite toJSON
 #' @importFrom sf st_read st_make_valid
-fetch_country_geom_by_relation <- function(rel_id) {
+fetch_country_geom_by_relation <- function(rel_id, force_refresh = FALSE) {
+  cache_key <- as.character(rel_id)
+  geom_cache <- .api_cache$geoms
+
+  if (!force_refresh && exists(cache_key, envir = geom_cache, inherits = FALSE)) {
+    return(geom_cache[[cache_key]])
+  }
+
   req <- request("https://nominatim.openstreetmap.org/lookup") |>
     req_user_agent("GeoGuessr/1.0 (felun463@student.liu.se)") |>
     req_url_query(
@@ -141,5 +164,9 @@ fetch_country_geom_by_relation <- function(rel_id) {
   fc <- list(type = "FeatureCollection", features = list(feature))
   tmp <- tempfile(fileext = ".geojson")
   writeLines(toJSON(fc, auto_unbox = TRUE), tmp)
-  st_read(tmp, quiet = TRUE) |> st_make_valid()
+  result <- st_read(tmp, quiet = TRUE) |> st_make_valid()
+
+  assign(cache_key, result, envir = geom_cache)
+
+  result
 }
