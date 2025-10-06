@@ -21,11 +21,32 @@ NULL
 .api_cache$countries <- NULL
 .api_cache$geoms <- new.env(parent = emptyenv())
 
+.europe_iso3166 <- c(
+  "AL","AD","AM","AT","AZ","BY","BE","BA","BG","HR","CY","CZ",
+  "DK","EE","FI","FR","GE","DE","GR","HU","IS","IE","IT","KZ",
+  "XK","LV","LI","LT","LU","MT","MD","MC","ME","NL","MK","NO",
+  "PL","PT","RO","RU","SM","RS","SK","SI","ES","SE","CH","TR",
+  "UA","GB","VA","AX","GG","JE","IM","FO","GI","SJ"
+)
+
+.europe_country_names <- tolower(c(
+  "Albania","Andorra","Armenia","Austria","Azerbaijan","Belarus","Belgium",
+  "Bosnia and Herzegovina","Bulgaria","Croatia","Cyprus","Czechia","Czech Republic",
+  "Denmark","Estonia","Finland","France","Georgia","Germany","Greece","Hungary",
+  "Iceland","Ireland","Italy","Kazakhstan","Kosovo","Latvia","Liechtenstein",
+  "Lithuania","Luxembourg","Malta","Moldova","Monaco","Montenegro",
+  "Netherlands","North Macedonia","Macedonia","Norway","Poland","Portugal",
+  "Romania","Russia","San Marino","Serbia","Slovakia","Slovenia",
+  "Spain","Sweden","Switzerland","Turkey","Ukraine","United Kingdom",
+  "Vatican City","Holy See","Aland Islands","Åland Islands","Guernsey","Jersey",
+  "Isle of Man","Faroe Islands","Gibraltar","Svalbard and Jan Mayen"
+))
+
 #' Fetch the list of available countries from Overpass
 #'
 #' Queries the public Overpass API for OSM relations tagged as
-#' country-level administrative boundaries (admin\_level = 2) and returns
-#' a parsed data frame of the CSV response. The output includes columns like
+#' country-level administrative boundaries (admin\_level = 2) within Europe and
+#' returns a parsed data frame of the CSV response. The output includes columns like
 #' `::type`, `::id`, `type`, `boundary`, `land_area`, `ISO3166-1`, `name:en`,
 #' `name`, and `::count` (depending on availability in OSM).
 #'
@@ -34,6 +55,9 @@ NULL
 #' The request sets a custom `User-Agent` as recommended by the service
 #' maintainers. The response body is parsed with `utils::read.csv()` using
 #' `check.names = FALSE` so that header names like `"::id"` are preserved.
+#' After parsing, results are filtered to `boundary` relations whose ISO code
+#' or English name is associated with Europe so the Shiny app stays focused on
+#' that region.
 #'
 #' **Important:** The Overpass API is a community resource. Be mindful of
 #' query complexity and frequency. If you run many tests or scripts, add
@@ -43,8 +67,7 @@ NULL
 #'   queries Overpass again. Defaults to `FALSE`.
 #'
 #' @return
-#' A `data.frame` where each row represents a country relation (and possibly
-#' a `land_area` relation where available). Column types are inferred by
+#' A `data.frame` where each row represents a European country relation. Column types are inferred by
 #' `read.csv()` and may vary (e.g., `::id` may be character or integer).
 #'
 #' @examples
@@ -72,7 +95,6 @@ fetch_countries <- function(force_refresh = FALSE) {
   )];
   (
   relation["type"="boundary"]["boundary"="administrative"]["admin_level"="2"];
-  relation["type"="land_area"]["admin_level"="2"];
   );
   out;
   out count;
@@ -91,6 +113,27 @@ fetch_countries <- function(force_refresh = FALSE) {
   if ("type" %in% names(df)) {
     df <- df[df$type == "boundary", , drop = FALSE]
   }
+
+  keep_iso <- rep(FALSE, nrow(df))
+  if ("ISO3166-1" %in% names(df)) {
+    iso_col <- df[["ISO3166-1"]]
+    iso_split <- strsplit(ifelse(is.na(iso_col), "", iso_col), ";", fixed = TRUE)
+    keep_iso <- vapply(
+      iso_split,
+      function(x) any(trimws(x[nzchar(x)]) %in% .europe_iso3166),
+      logical(1)
+    )
+  }
+
+  keep_name <- rep(FALSE, nrow(df))
+  if ("name:en" %in% names(df)) {
+    keep_name <- tolower(df[["name:en"]]) %in% .europe_country_names
+  } else if ("name" %in% names(df)) {
+    keep_name <- tolower(df[["name"]]) %in% .europe_country_names
+  }
+
+  keep <- keep_iso | keep_name
+  df <- df[keep, , drop = FALSE]
 
   .api_cache$countries <- df
 
