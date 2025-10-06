@@ -140,6 +140,7 @@ server <- function(input, output, session) {
     updateTextInput(session, "guess", value = "")
     shinyjs::enable("guess_btn")
     shinyjs::enable("guess")
+    shinyjs::enable("next_btn")
   }
 
 
@@ -180,11 +181,13 @@ server <- function(input, output, session) {
 
   shinyjs::disable("guess_btn")
   shinyjs::disable("guess")
+  shinyjs::disable("next_btn")
 
   if (identical(user_guess, "")) {
     output$feedback <- renderText("Type a guess before clicking Guess!")
     shinyjs::enable("guess_btn")
     shinyjs::enable("guess")
+    shinyjs::enable("next_btn")
     return(invisible())
   }
 
@@ -206,6 +209,7 @@ server <- function(input, output, session) {
         "WRONG! It was %s. You lost 1 health and have 0 left. Game over! Final score: %d.",
         rv$current[["name:en"]], rv$score
       ))
+      shinyjs::enable("next_btn")
     } else {
       output$feedback <- renderText(sprintf(
         "WRONG! It was %s. You lost 1 health. %d health remaining. Loading next country...",
