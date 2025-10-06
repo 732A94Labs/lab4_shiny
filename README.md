@@ -3,5 +3,5 @@
 Run the application directly from R with:
 
 ```r
-shiny::runGitHub("lab4_shiny", "732A94Labs", ref = "main")
+shiny::runGitHub("lab5_shiny", "732A94Labs", ref = "main")
 ```
