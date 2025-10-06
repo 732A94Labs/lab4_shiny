@@ -88,6 +88,9 @@ fetch_countries <- function(force_refresh = FALSE) {
   txt <- resp_body_string(resp)
 
   df <- read.csv(text = txt, stringsAsFactors = FALSE, check.names = FALSE)
+  if ("type" %in% names(df)) {
+    df <- df[df$type == "boundary", , drop = FALSE]
+  }
 
   .api_cache$countries <- df
 
