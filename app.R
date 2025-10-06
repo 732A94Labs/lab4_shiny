@@ -9,6 +9,8 @@ if (length(missing_pkgs)) {
 }
 
 source("api_client.R")
+library(httr2)
+library(jsonlite)
 library(shiny)
 library(sf)
 library(bslib)
