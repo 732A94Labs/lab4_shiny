@@ -220,7 +220,7 @@ server <- function(input, output, session) {
   }
 })
 
-  observeEvent(input$reset_btn, start_game)
+  observeEvent(input$reset_btn, start_game())
 }
 
 shinyApp(ui, server)
